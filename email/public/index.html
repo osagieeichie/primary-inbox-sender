@@ -158,8 +158,80 @@
 
         .message-area textarea {
             min-height: 300px;
-            font-family: 'Courier New', monospace;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.5;
+            border: none;
+            outline: none;
+            resize: vertical;
+        }
+
+        .formatting-toolbar {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            padding: 8px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .format-btn {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .format-btn:hover {
+            background: #e8f0fe;
+            border-color: #1a73e8;
+        }
+
+        .format-btn.active {
+            background: #1a73e8;
+            color: white;
+            border-color: #1a73e8;
+        }
+
+        .format-select {
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 4px 8px;
+            font-size: 13px;
+        }
+
+        .message-editor {
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            min-height: 300px;
+            padding: 15px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            outline: none;
+            background: white;
+        }
+
+        .editor-container {
+            position: relative;
+        }
+
+        .format-group {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+            padding-right: 8px;
+            border-right: 1px solid #ddd;
+        }
+
+        .format-group:last-child {
+            border-right: none;
         }
 
         .send-controls {
@@ -288,13 +360,79 @@
                 
                 <div class="message-area">
                     <div class="form-group">
-                        <label>Message (Plain Text Only)</label>
-                        <textarea id="message" placeholder="Hi there,
+                        <label>Message</label>
+                        <div class="editor-container">
+                            <div class="formatting-toolbar">
+                                <div class="format-group">
+                                    <select class="format-select" onchange="formatText('fontName', this.value)">
+                                        <option value="Arial">Arial</option>
+                                        <option value="Times New Roman">Times New Roman</option>
+                                        <option value="Helvetica">Helvetica</option>
+                                        <option value="Georgia">Georgia</option>
+                                        <option value="Verdana">Verdana</option>
+                                    </select>
+                                    <select class="format-select" onchange="formatText('fontSize', this.value)">
+                                        <option value="3">Normal</option>
+                                        <option value="1">Small</option>
+                                        <option value="2">Medium</option>
+                                        <option value="4">Large</option>
+                                        <option value="5">X-Large</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="format-group">
+                                    <button type="button" class="format-btn" onclick="formatText('bold')" title="Bold"><b>B</b></button>
+                                    <button type="button" class="format-btn" onclick="formatText('italic')" title="Italic"><i>I</i></button>
+                                    <button type="button" class="format-btn" onclick="formatText('underline')" title="Underline"><u>U</u></button>
+                                    <button type="button" class="format-btn" onclick="formatText('strikeThrough')" title="Strikethrough"><s>S</s></button>
+                                </div>
+                                
+                                <div class="format-group">
+                                    <input type="color" class="format-btn" onchange="formatText('foreColor', this.value)" title="Text Color" style="width: 40px; height: 28px; padding: 2px;">
+                                    <button type="button" class="format-btn" onclick="formatText('hiliteColor', 'yellow')" title="Highlight" style="background: yellow;">H</button>
+                                </div>
+                                
+                                <div class="format-group">
+                                    <button type="button" class="format-btn" onclick="formatText('justifyLeft')" title="Align Left">⬅</button>
+                                    <button type="button" class="format-btn" onclick="formatText('justifyCenter')" title="Center">⬛</button>
+                                    <button type="button" class="format-btn" onclick="formatText('justifyRight')" title="Align Right">➡</button>
+                                </div>
+                                
+                                <div class="format-group">
+                                    <button type="button" class="format-btn" onclick="formatText('insertUnorderedList')" title="Bullet List">• List</button>
+                                    <button type="button" class="format-btn" onclick="formatText('insertOrderedList')" title="Numbered List">1. List</button>
+                                </div>
+                                
+                                <div class="format-group">
+                                    <button type="button" class="format-btn" onclick="insertLink()" title="Insert Link">🔗</button>
+                                    <button type="button" class="format-btn" onclick="formatText('removeFormat')" title="Clear Formatting">Clear</button>
+                                </div>
+                                
+                                <div class="format-group">
+                                    <button type="button" class="format-btn" onclick="togglePlainText()" title="Toggle Plain Text Mode" id="plainTextToggle">📝 Plain Text</button>
+                                </div>
+                            </div>
+                            
+                            <div id="messageEditor" 
+                                 class="message-editor" 
+                                 contenteditable="true" 
+                                 placeholder="Hi there,
+
+I hope you're doing well! I wanted to reach out personally about...
+
+Best regards,
+Your Name">
+                            </div>
+                            
+                            <textarea id="message" 
+                                     style="display: none;"
+                                     placeholder="Hi there,
 
 I hope you're doing well! I wanted to reach out personally about...
 
 Best regards,
 Your Name"></textarea>
+                        </div>
                     </div>
                 </div>
                 
@@ -311,11 +449,79 @@ Your Name"></textarea>
 
     <script>
         let emailLists = [];
+        let isPlainTextMode = false;
 
         // Load email lists on page load
         window.onload = function() {
             loadEmailLists();
+            
+            // Set up the editor
+            const editor = document.getElementById('messageEditor');
+            const textarea = document.getElementById('message');
+            
+            // Sync editor content with hidden textarea
+            editor.addEventListener('input', function() {
+                if (!isPlainTextMode) {
+                    textarea.value = editor.innerHTML;
+                }
+            });
         };
+
+        function formatText(command, value = null) {
+            document.execCommand(command, false, value);
+            document.getElementById('messageEditor').focus();
+        }
+
+        function insertLink() {
+            const url = prompt('Enter the URL:');
+            if (url) {
+                formatText('createLink', url);
+            }
+        }
+
+        function togglePlainText() {
+            const editor = document.getElementById('messageEditor');
+            const textarea = document.getElementById('message');
+            const toggleBtn = document.getElementById('plainTextToggle');
+            const toolbar = document.querySelector('.formatting-toolbar');
+            
+            isPlainTextMode = !isPlainTextMode;
+            
+            if (isPlainTextMode) {
+                // Switch to plain text
+                textarea.value = editor.innerText;
+                editor.style.display = 'none';
+                textarea.style.display = 'block';
+                toolbar.style.display = 'none';
+                toggleBtn.textContent = '🎨 Rich Text';
+                toggleBtn.title = 'Switch to Rich Text Mode';
+            } else {
+                // Switch to rich text
+                editor.innerHTML = textarea.value.replace(/\n/g, '<br>');
+                editor.style.display = 'block';
+                textarea.style.display = 'none';
+                toolbar.style.display = 'flex';
+                toggleBtn.textContent = '📝 Plain Text';
+                toggleBtn.title = 'Switch to Plain Text Mode';
+            }
+        }
+
+        function getMessageContent() {
+            const editor = document.getElementById('messageEditor');
+            const textarea = document.getElementById('message');
+            
+            if (isPlainTextMode) {
+                return {
+                    text: textarea.value,
+                    html: textarea.value.replace(/\n/g, '<br>')
+                };
+            } else {
+                return {
+                    text: editor.innerText,
+                    html: editor.innerHTML
+                };
+            }
+        }
 
         async function loadEmailLists() {
             try {
@@ -407,10 +613,10 @@ Your Name"></textarea>
         async function sendEmails() {
             const listId = document.getElementById('selectedList').value;
             const subject = document.getElementById('subject').value.trim();
-            const message = document.getElementById('message').value.trim();
+            const messageContent = getMessageContent();
             const senderName = document.getElementById('senderName').value.trim();
             
-            if (!listId || !subject || !message || !senderName) {
+            if (!listId || !subject || !messageContent.text.trim() || !senderName) {
                 showStatus('Please fill in all fields and select a list', 'error');
                 return;
             }
@@ -431,7 +637,8 @@ Your Name"></textarea>
                     body: JSON.stringify({
                         listId,
                         subject,
-                        message,
+                        message: messageContent.text,
+                        html: messageContent.html,
                         senderName
                     })
                 });

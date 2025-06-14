@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Email configuration - using SMTP with your domain
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST, // Your domain's SMTP server
   port: 587,
   secure: false,

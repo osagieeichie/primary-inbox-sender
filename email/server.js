@@ -7,21 +7,22 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Email configuration - using SMTP with your domain
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST, // Your domain's SMTP server
+  host: process.env.SMTP_HOST,
   port: 587,
   secure: false,
-  auth: {
-    user: process.env.SMTP_USER, // hey@enchantgifts.store
-    pass: process.env.SMTP_PASS  // Your email password or app password
+  requireTLS: true,
+  tls: {
+    rejectUnauthorized: false
   },
-  // Remove tracking headers and keep it clean
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  },
   headers: {
     'X-Priority': '3',
     'X-MSMail-Priority': 'Normal',
@@ -29,21 +30,16 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Store email lists in memory (in production, use a database)
 let emailLists = [];
-let emailTemplates = [];
 
-// Routes
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Get all email lists
 app.get('/api/lists', (req, res) => {
   res.json(emailLists);
 });
 
-// Create new email list
 app.post('/api/lists', (req, res) => {
   const { name, emails } = req.body;
   const newList = {
@@ -56,13 +52,11 @@ app.post('/api/lists', (req, res) => {
   res.json(newList);
 });
 
-// Delete email list
 app.delete('/api/lists/:id', (req, res) => {
   emailLists = emailLists.filter(list => list.id !== req.params.id);
   res.json({ success: true });
 });
 
-// Send email to list
 app.post('/api/send', async (req, res) => {
   const { listId, subject, message, senderName } = req.body;
   
@@ -75,26 +69,20 @@ app.post('/api/send', async (req, res) => {
   
   for (const email of list.emails) {
     try {
-      // Send each email individually to avoid bulk detection
       await transporter.sendMail({
         from: `${senderName} <hey@enchantgifts.store>`,
         to: email,
         subject: subject,
-        text: message, // Plain text only, no HTML
-        // Remove all tracking and bulk indicators
+        text: message,
         headers: {
           'List-Unsubscribe': null,
           'X-Mailer': null,
           'X-Campaign': null,
-          'X-Mailgun': null,
-          'X-SendGrid': null,
           'Precedence': null
         }
       });
       
       results.push({ email, status: 'sent' });
-      
-      // Add delay between emails to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 2000));
       
     } catch (error) {
@@ -106,7 +94,6 @@ app.post('/api/send', async (req, res) => {
   res.json({ results });
 });
 
-// Test email configuration
 app.post('/api/test', async (req, res) => {
   try {
     await transporter.verify();

@@ -12,24 +12,15 @@ app.use(express.json());
 app.use(express.static('public'));
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  tls: {
-    rejectUnauthorized: false
-  },
+  service: 'gmail',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   },
-  headers: {
-    'X-Priority': '3',
-    'X-MSMail-Priority': 'Normal',
-    'Importance': 'Normal'
+  tls: {
+    rejectUnauthorized: false
   }
 });
-
 let emailLists = [];
 
 app.get('/', (req, res) => {

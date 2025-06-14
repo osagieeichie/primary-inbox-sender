@@ -7,49 +7,69 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
+// Email configuration - using SMTP with your domain
+const transporter = nodemailer.createTransporter({
+  host: process.env.SMTP_HOST, // Your domain's SMTP server
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    user: process.env.SMTP_USER, // hey@enchantgifts.store
+    pass: process.env.SMTP_PASS  // Your email password or app password
   },
-  tls: {
-    rejectUnauthorized: false
+  // Remove tracking headers and keep it clean
+  headers: {
+    'X-Priority': '3',
+    'X-MSMail-Priority': 'Normal',
+    'Importance': 'Normal'
   }
 });
-let emailLists = [];
 
+// Store email lists in memory (in production, use a database)
+let emailLists = [];
+let emailTemplates = [];
+
+// Routes
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Get all email lists
 app.get('/api/lists', (req, res) => {
   res.json(emailLists);
 });
 
+// Create new email list
 app.post('/api/lists', (req, res) => {
-  const { name, emails } = req.body;
+  const { name, contacts, emails } = req.body;
   const newList = {
     id: Date.now().toString(),
     name,
-    emails: emails.split('\n').filter(email => email.trim()),
+    contacts: contacts || emails?.split('\n').filter(email => email.trim()).map((email, index) => ({
+      sn: index + 1,
+      firstName: '',
+      lastName: '',
+      email: email.trim()
+    })) || [],
     createdAt: new Date()
   };
   emailLists.push(newList);
   res.json(newList);
 });
 
+// Delete email list
 app.delete('/api/lists/:id', (req, res) => {
   emailLists = emailLists.filter(list => list.id !== req.params.id);
   res.json({ success: true });
 });
 
+// Send email to list
 app.post('/api/send', async (req, res) => {
-  const { listId, subject, message, senderName } = req.body;
+  const { listId, subject, message, html, senderName } = req.body;
   
   const list = emailLists.find(l => l.id === listId);
   if (!list) {
@@ -57,34 +77,64 @@ app.post('/api/send', async (req, res) => {
   }
 
   const results = [];
+  const contacts = list.contacts || list.emails?.map(email => ({ email, firstName: '' })) || [];
   
-  for (const email of list.emails) {
+  for (const contact of contacts) {
     try {
-      await transporter.sendMail({
+      // Personalize the message for each contact
+      const personalizedSubject = contact.firstName ? 
+        subject.replace(/\{\{firstName\}\}/g, contact.firstName) : subject;
+      
+      const personalizedMessage = contact.firstName ? 
+        message.replace(/\{\{firstName\}\}/g, contact.firstName) : message;
+      
+      const personalizedHtml = html && contact.firstName ? 
+        html.replace(/\{\{firstName\}\}/g, contact.firstName) : html;
+
+      const mailOptions = {
         from: `${senderName} <hey@enchantgifts.store>`,
-        to: email,
-        subject: subject,
-        text: message,
+        to: contact.email,
+        subject: personalizedSubject,
+        text: personalizedMessage,
         headers: {
           'List-Unsubscribe': null,
           'X-Mailer': null,
           'X-Campaign': null,
           'Precedence': null
         }
+      };
+
+      // Add HTML version if rich text was used
+      if (personalizedHtml && personalizedHtml !== personalizedMessage) {
+        mailOptions.html = personalizedHtml;
+      }
+
+      await transporter.sendMail(mailOptions);
+      
+      results.push({ 
+        email: contact.email, 
+        firstName: contact.firstName,
+        status: 'sent' 
       });
       
-      results.push({ email, status: 'sent' });
+      // Add delay between emails to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 2000));
       
     } catch (error) {
-      console.error(`Failed to send to ${email}:`, error);
-      results.push({ email, status: 'failed', error: error.message });
+      console.error(`Failed to send to ${contact.email}:`, error);
+      results.push({ 
+        email: contact.email, 
+        firstName: contact.firstName,
+        status: 'failed', 
+        error: error.message 
+      });
     }
   }
   
   res.json({ results });
 });
 
+// Test email configuration
 app.post('/api/test', async (req, res) => {
   try {
     await transporter.verify();

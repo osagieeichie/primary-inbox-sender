@@ -13,15 +13,25 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Email configuration - using SMTP with your domain
+
 const transporter = nodemailer.createTransport({
+
   service: 'gmail',
+
   auth: {
+
     user: process.env.SMTP_USER,
+
     pass: process.env.SMTP_PASS
+
   },
+
   tls: {
+
     rejectUnauthorized: false
+
   }
+
 });
 
 // Store email lists in memory (in production, use a database)
@@ -81,8 +91,6 @@ app.post('/api/send', async (req, res) => {
     return res.status(404).json({ error: 'List not found' });
   }
 
-  const results = [];
-  
   // Handle both old format (emails array) and new format (contacts array)
   let contacts = [];
   if (list.contacts && list.contacts.length > 0) {
@@ -90,8 +98,29 @@ app.post('/api/send', async (req, res) => {
   } else if (list.emails && list.emails.length > 0) {
     contacts = list.emails.map(email => ({ email, firstName: '' }));
   }
+
+  // Send response immediately and process emails in background
+  res.json({ 
+    message: `Started sending to ${contacts.length} contacts`,
+    totalContacts: contacts.length,
+    status: 'processing'
+  });
+
+  // Process emails in background
+  processEmailsInBackground(contacts, subject, message, html, senderName);
+});
+
+// Background email processing function
+async function processEmailsInBackground(contacts, subject, message, html, senderName) {
+  const results = [];
+  let successCount = 0;
+  let failCount = 0;
   
-  for (const contact of contacts) {
+  console.log(`Starting to send ${contacts.length} emails...`);
+  
+  for (let i = 0; i < contacts.length; i++) {
+    const contact = contacts[i];
+    
     try {
       // Personalize the message for each contact
       let personalizedSubject = subject;
@@ -126,28 +155,28 @@ app.post('/api/send', async (req, res) => {
 
       await transporter.sendMail(mailOptions);
       
-      results.push({ 
-        email: contact.email, 
-        firstName: contact.firstName || '',
-        status: 'sent' 
-      });
+      successCount++;
+      console.log(`✅ Sent ${i + 1}/${contacts.length} to ${contact.email}`);
       
-      // Add delay between emails to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Shorter delay for larger lists, longer for smaller lists
+      const delay = contacts.length > 100 ? 1000 : 2000; // 1 second for large lists
+      await new Promise(resolve => setTimeout(resolve, delay));
       
     } catch (error) {
-      console.error(`Failed to send to ${contact.email}:`, error);
-      results.push({ 
-        email: contact.email, 
-        firstName: contact.firstName || '',
-        status: 'failed', 
-        error: error.message 
-      });
+      failCount++;
+      console.error(`❌ Failed ${i + 1}/${contacts.length} to ${contact.email}:`, error.message);
+      
+      // Continue with other emails even if one fails
+    }
+    
+    // Log progress every 50 emails
+    if ((i + 1) % 50 === 0) {
+      console.log(`Progress: ${i + 1}/${contacts.length} processed. ✅ ${successCount} sent, ❌ ${failCount} failed`);
     }
   }
   
-  res.json({ results });
-});
+  console.log(`🎉 Email sending completed! ✅ ${successCount} sent, ❌ ${failCount} failed out of ${contacts.length} total`);
+}
 
 // Test email configuration
 app.post('/api/test', async (req, res) => {

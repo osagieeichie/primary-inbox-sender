@@ -5,7 +5,7 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // Middleware
 app.use(cors());
@@ -46,17 +46,27 @@ app.get('/api/lists', (req, res) => {
 // Create new email list
 app.post('/api/lists', (req, res) => {
   const { name, contacts, emails } = req.body;
-  const newList = {
-    id: Date.now().toString(),
-    name,
-    contacts: contacts || emails?.split('\n').filter(email => email.trim()).map((email, index) => ({
+  
+  let contactList = [];
+  
+  if (contacts && contacts.length > 0) {
+    contactList = contacts;
+  } else if (emails) {
+    contactList = emails.split('\n').filter(email => email.trim()).map((email, index) => ({
       sn: index + 1,
       firstName: '',
       lastName: '',
       email: email.trim()
-    })) || [],
+    }));
+  }
+  
+  const newList = {
+    id: Date.now().toString(),
+    name,
+    contacts: contactList,
     createdAt: new Date()
   };
+  
   emailLists.push(newList);
   res.json(newList);
 });
@@ -77,19 +87,29 @@ app.post('/api/send', async (req, res) => {
   }
 
   const results = [];
-  const contacts = list.contacts || list.emails?.map(email => ({ email, firstName: '' })) || [];
+  
+  // Handle both old format (emails array) and new format (contacts array)
+  let contacts = [];
+  if (list.contacts && list.contacts.length > 0) {
+    contacts = list.contacts;
+  } else if (list.emails && list.emails.length > 0) {
+    contacts = list.emails.map(email => ({ email, firstName: '' }));
+  }
   
   for (const contact of contacts) {
     try {
       // Personalize the message for each contact
-      const personalizedSubject = contact.firstName ? 
-        subject.replace(/\{\{firstName\}\}/g, contact.firstName) : subject;
+      let personalizedSubject = subject;
+      let personalizedMessage = message;
+      let personalizedHtml = html;
       
-      const personalizedMessage = contact.firstName ? 
-        message.replace(/\{\{firstName\}\}/g, contact.firstName) : message;
-      
-      const personalizedHtml = html && contact.firstName ? 
-        html.replace(/\{\{firstName\}\}/g, contact.firstName) : html;
+      if (contact.firstName) {
+        personalizedSubject = subject.replace(/\{\{firstName\}\}/g, contact.firstName);
+        personalizedMessage = message.replace(/\{\{firstName\}\}/g, contact.firstName);
+        if (html) {
+          personalizedHtml = html.replace(/\{\{firstName\}\}/g, contact.firstName);
+        }
+      }
 
       const mailOptions = {
         from: `${senderName} <hey@enchantgifts.store>`,
@@ -113,7 +133,7 @@ app.post('/api/send', async (req, res) => {
       
       results.push({ 
         email: contact.email, 
-        firstName: contact.firstName,
+        firstName: contact.firstName || '',
         status: 'sent' 
       });
       
@@ -124,7 +144,7 @@ app.post('/api/send', async (req, res) => {
       console.error(`Failed to send to ${contact.email}:`, error);
       results.push({ 
         email: contact.email, 
-        firstName: contact.firstName,
+        firstName: contact.firstName || '',
         status: 'failed', 
         error: error.message 
       });

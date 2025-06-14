@@ -780,7 +780,7 @@ Your Name
             
             sendBtn.disabled = true;
             sendBtn.textContent = 'Sending...';
-            sendStatus.textContent = 'Preparing to send emails...';
+            sendStatus.textContent = 'Starting email send process...';
             
             try {
                 const response = await fetch('/api/send', {
@@ -800,9 +800,14 @@ Your Name
                 const result = await response.json();
                 
                 if (response.ok) {
-                    const successful = result.results.filter(r => r.status === 'sent').length;
-                    const failed = result.results.filter(r => r.status === 'failed').length;
-                    showStatus(`Emails sent! ✅ ${successful} successful, ❌ ${failed} failed`, 'success');
+                    if (result.status === 'processing') {
+                        showStatus(`🚀 Email sending started! Processing ${result.totalContacts} contacts in background. Check Railway logs for progress.`, 'success');
+                        sendStatus.textContent = `Processing ${result.totalContacts} emails in background...`;
+                    } else {
+                        const successful = result.results.filter(r => r.status === 'sent').length;
+                        const failed = result.results.filter(r => r.status === 'failed').length;
+                        showStatus(`Emails sent! ✅ ${successful} successful, ❌ ${failed} failed`, 'success');
+                    }
                 } else {
                     showStatus('Error sending emails: ' + result.error, 'error');
                 }
@@ -811,7 +816,11 @@ Your Name
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = 'Send Emails';
-                sendStatus.textContent = '';
+                
+                // For large lists, keep showing background processing status
+                if (!sendStatus.textContent.includes('background')) {
+                    sendStatus.textContent = '';
+                }
             }
         }
 

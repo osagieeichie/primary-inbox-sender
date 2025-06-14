@@ -319,9 +319,35 @@
                     <input type="text" id="listName" placeholder="List name (e.g., 'Customers')">
                 </div>
                 
-                <div class="form-group">
-                    <label>Email Addresses (one per line)</label>
-                    <textarea id="emailAddresses" placeholder="john@example.com&#10;jane@example.com&#10;mike@example.com"></textarea>
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="toggleInputMethod('manual')" id="manualBtn">Manual Entry</button>
+                        <button type="button" class="btn" onclick="toggleInputMethod('csv')" id="csvBtn">CSV Upload</button>
+                    </div>
+                </div>
+                
+                <!-- Manual Entry -->
+                <div id="manualEntry" style="display: block;">
+                    <div class="form-group">
+                        <label>Email Addresses (one per line)</label>
+                        <textarea id="emailAddresses" placeholder="john@example.com&#10;jane@example.com&#10;mike@example.com"></textarea>
+                    </div>
+                </div>
+                
+                <!-- CSV Upload -->
+                <div id="csvEntry" style="display: none;">
+                    <div class="form-group">
+                        <label>Upload CSV File</label>
+                        <input type="file" id="csvFile" accept=".csv" onchange="handleCSVUpload(event)">
+                        <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">
+                            CSV should have columns: S/N, First Name, Last Name, Email
+                        </small>
+                    </div>
+                    
+                    <div id="csvPreview" style="display: none; margin-top: 15px;">
+                        <label>CSV Preview:</label>
+                        <div id="csvPreviewContent" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; font-size: 12px; background: #f9f9f9;"></div>
+                    </div>
                 </div>
                 
                 <button class="btn" onclick="createList()">Create List</button>
@@ -416,22 +442,26 @@
                             <div id="messageEditor" 
                                  class="message-editor" 
                                  contenteditable="true" 
-                                 placeholder="Hi there,
+                                 placeholder="Hi {{firstName}},
 
 I hope you're doing well! I wanted to reach out personally about...
 
 Best regards,
-Your Name">
+Your Name
+
+💡 Tip: Use {{firstName}} to automatically personalize each email">
                             </div>
                             
                             <textarea id="message" 
                                      style="display: none;"
-                                     placeholder="Hi there,
+                                     placeholder="Hi {{firstName}},
 
 I hope you're doing well! I wanted to reach out personally about...
 
 Best regards,
-Your Name"></textarea>
+Your Name
+
+💡 Tip: Use {{firstName}} to automatically personalize each email"></textarea>
                         </div>
                     </div>
                 </div>
@@ -450,6 +480,7 @@ Your Name"></textarea>
     <script>
         let emailLists = [];
         let isPlainTextMode = false;
+        let csvData = [];
 
         // Load email lists on page load
         window.onload = function() {
@@ -466,6 +497,89 @@ Your Name"></textarea>
                 }
             });
         };
+
+        function toggleInputMethod(method) {
+            const manualEntry = document.getElementById('manualEntry');
+            const csvEntry = document.getElementById('csvEntry');
+            const manualBtn = document.getElementById('manualBtn');
+            const csvBtn = document.getElementById('csvBtn');
+            
+            if (method === 'manual') {
+                manualEntry.style.display = 'block';
+                csvEntry.style.display = 'none';
+                manualBtn.className = 'btn';
+                csvBtn.className = 'btn btn-secondary';
+                csvData = [];
+            } else {
+                manualEntry.style.display = 'none';
+                csvEntry.style.display = 'block';
+                manualBtn.className = 'btn btn-secondary';
+                csvBtn.className = 'btn';
+            }
+        }
+
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                parseCSV(csv);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            
+            // Find column indices
+            const snIndex = headers.findIndex(h => h.includes('s/n') || h.includes('sn') || h.includes('serial'));
+            const firstNameIndex = headers.findIndex(h => h.includes('first') || h.includes('fname'));
+            const lastNameIndex = headers.findIndex(h => h.includes('last') || h.includes('lname'));
+            const emailIndex = headers.findIndex(h => h.includes('email') || h.includes('mail'));
+            
+            if (emailIndex === -1) {
+                showStatus('CSV must contain an email column', 'error');
+                return;
+            }
+            
+            csvData = [];
+            let preview = '<table style="width: 100%; font-size: 11px;"><tr>';
+            preview += '<th>S/N</th><th>First Name</th><th>Last Name</th><th>Email</th></tr>';
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                
+                const columns = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
+                
+                const contact = {
+                    sn: snIndex >= 0 ? columns[snIndex] : i,
+                    firstName: firstNameIndex >= 0 ? columns[firstNameIndex] : '',
+                    lastName: lastNameIndex >= 0 ? columns[lastNameIndex] : '',
+                    email: columns[emailIndex]
+                };
+                
+                if (contact.email && contact.email.includes('@')) {
+                    csvData.push(contact);
+                    
+                    preview += `<tr>
+                        <td>${contact.sn}</td>
+                        <td>${contact.firstName}</td>
+                        <td>${contact.lastName}</td>
+                        <td>${contact.email}</td>
+                    </tr>`;
+                }
+            }
+            
+            preview += '</table>';
+            
+            document.getElementById('csvPreview').style.display = 'block';
+            document.getElementById('csvPreviewContent').innerHTML = preview;
+            
+            showStatus(`CSV loaded: ${csvData.length} contacts found`, 'success');
+        }
 
         function formatText(command, value = null) {
             document.execCommand(command, false, value);
@@ -547,7 +661,10 @@ Your Name"></textarea>
                     <div>
                         <strong>${list.name}</strong>
                         <br>
-                        <small>${list.emails.length} emails</small>
+                        <small>${list.contacts ? list.contacts.length : list.emails?.length || 0} contacts</small>
+                        ${list.contacts && list.contacts.some(c => c.firstName) ? 
+                            '<br><small style="color: #1a73e8;">✨ Personalization enabled</small>' : ''
+                        }
                     </div>
                     <button class="btn btn-danger" onclick="deleteList('${list.id}')" style="padding: 5px 10px; font-size: 12px;">Delete</button>
                 </div>
@@ -557,16 +674,40 @@ Your Name"></textarea>
         function updateListSelector() {
             const selector = document.getElementById('selectedList');
             selector.innerHTML = '<option value="">Choose a list...</option>' + 
-                emailLists.map(list => `<option value="${list.id}">${list.name} (${list.emails.length} emails)</option>`).join('');
+                emailLists.map(list => {
+                    const count = list.contacts ? list.contacts.length : list.emails?.length || 0;
+                    const hasPersonalization = list.contacts && list.contacts.some(c => c.firstName);
+                    return `<option value="${list.id}">${list.name} (${count} contacts)${hasPersonalization ? ' ✨' : ''}</option>`;
+                }).join('');
         }
 
         async function createList() {
             const name = document.getElementById('listName').value.trim();
-            const emails = document.getElementById('emailAddresses').value.trim();
             
-            if (!name || !emails) {
-                showStatus('Please provide both list name and email addresses', 'error');
+            if (!name) {
+                showStatus('Please provide a list name', 'error');
                 return;
+            }
+            
+            let contacts = [];
+            
+            // Check if using CSV or manual entry
+            if (csvData.length > 0) {
+                contacts = csvData;
+            } else {
+                const emails = document.getElementById('emailAddresses').value.trim();
+                if (!emails) {
+                    showStatus('Please provide email addresses or upload a CSV', 'error');
+                    return;
+                }
+                
+                // Convert manual entries to contact format
+                contacts = emails.split('\n').filter(email => email.trim()).map((email, index) => ({
+                    sn: index + 1,
+                    firstName: '',
+                    lastName: '',
+                    email: email.trim()
+                }));
             }
             
             try {
@@ -575,12 +716,15 @@ Your Name"></textarea>
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ name, emails })
+                    body: JSON.stringify({ name, contacts })
                 });
                 
                 if (response.ok) {
                     document.getElementById('listName').value = '';
                     document.getElementById('emailAddresses').value = '';
+                    document.getElementById('csvFile').value = '';
+                    document.getElementById('csvPreview').style.display = 'none';
+                    csvData = [];
                     loadEmailLists();
                     showStatus('Email list created successfully!', 'success');
                 } else {

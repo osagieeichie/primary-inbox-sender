@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primary Inbox Email Sender</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+
+        .compose-area {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: #1557b0;
+        }
+
+        .btn-danger {
+            background: #d93025;
+        }
+
+        .btn-danger:hover {
+            background: #b52d20;
+        }
+
+        .btn-secondary {
+            background: #5f6368;
+        }
+
+        .btn-secondary:hover {
+            background: #4a4d52;
+        }
+
+        .email-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .email-list-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .email-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .compose-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .message-area {
+            margin-bottom: 20px;
+        }
+
+        .message-area textarea {
+            min-height: 300px;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+
+        .send-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d2e;
+            border: 1px solid #c3e6c3;
+        }
+
+        .status.error {
+            background: #fce8e6;
+            color: #d93025;
+            border: 1px solid #f9bdbb;
+        }
+
+        .tips {
+            background: #e8f4fd;
+            border: 1px solid #4285f4;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .tips h3 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+        }
+
+        .tips ul {
+            margin-left: 20px;
+        }
+
+        .tips li {
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .compose-header {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Primary Inbox Email Sender</h1>
+            <p>Send emails that land in the primary inbox - No tracking, no bulk headers, just clean personal emails</p>
+        </div>
+
+        <div class="tips">
+            <h3>💡 Tips for Primary Inbox Delivery</h3>
+            <ul>
+                <li>Keep emails personal and conversational</li>
+                <li>Use plain text format (no HTML)</li>
+                <li>Avoid promotional language and excessive formatting</li>
+                <li>Send from a warm domain with good reputation</li>
+                <li>Include personalized sender names</li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="section-title">📋 Email Lists</div>
+                
+                <div class="form-group">
+                    <label>Create New List</label>
+                    <input type="text" id="listName" placeholder="List name (e.g., 'Customers')">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email Addresses (one per line)</label>
+                    <textarea id="emailAddresses" placeholder="john@example.com&#10;jane@example.com&#10;mike@example.com"></textarea>
+                </div>
+                
+                <button class="btn" onclick="createList()">Create List</button>
+                
+                <div style="margin: 20px 0;">
+                    <div class="section-title">Saved Lists</div>
+                    <div id="emailLists" class="email-list">
+                        <div style="padding: 20px; text-align: center; color: #666;">
+                            No lists created yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="compose-area">
+                <div class="section-title">✍️ Compose Email</div>
+                
+                <div class="compose-header">
+                    <div class="form-group">
+                        <label>Select Email List</label>
+                        <select id="selectedList">
+                            <option value="">Choose a list...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Sender Name</label>
+                        <input type="text" id="senderName" placeholder="Your Name" value="EnchantGifts Team">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Subject Line</label>
+                    <input type="text" id="subject" placeholder="Keep it personal and conversational">
+                </div>
+                
+                <div class="message-area">
+                    <div class="form-group">
+                        <label>Message (Plain Text Only)</label>
+                        <textarea id="message" placeholder="Hi there,
+
+I hope you're doing well! I wanted to reach out personally about...
+
+Best regards,
+Your Name"></textarea>
+                    </div>
+                </div>
+                
+                <div class="send-controls">
+                    <button class="btn" onclick="sendEmails()" id="sendBtn">Send Emails</button>
+                    <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+                    <span id="sendStatus" style="margin-left: 10px; color: #666;"></span>
+                </div>
+                
+                <div id="statusMessage" class="status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let emailLists = [];
+
+        // Load email lists on page load
+        window.onload = function() {
+            loadEmailLists();
+        };
+
+        async function loadEmailLists() {
+            try {
+                const response = await fetch('/api/lists');
+                emailLists = await response.json();
+                updateListsDisplay();
+                updateListSelector();
+            } catch (error) {
+                console.error('Error loading lists:', error);
+            }
+        }
+
+        function updateListsDisplay() {
+            const container = document.getElementById('emailLists');
+            
+            if (emailLists.length === 0) {
+                container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No lists created yet</div>';
+                return;
+            }
+            
+            container.innerHTML = emailLists.map(list => `
+                <div class="email-list-item">
+                    <div>
+                        <strong>${list.name}</strong>
+                        <br>
+                        <small>${list.emails.length} emails</small>
+                    </div>
+                    <button class="btn btn-danger" onclick="deleteList('${list.id}')" style="padding: 5px 10px; font-size: 12px;">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        function updateListSelector() {
+            const selector = document.getElementById('selectedList');
+            selector.innerHTML = '<option value="">Choose a list...</option>' + 
+                emailLists.map(list => `<option value="${list.id}">${list.name} (${list.emails.length} emails)</option>`).join('');
+        }
+
+        async function createList() {
+            const name = document.getElementById('listName').value.trim();
+            const emails = document.getElementById('emailAddresses').value.trim();
+            
+            if (!name || !emails) {
+                showStatus('Please provide both list name and email addresses', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/lists', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, emails })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('listName').value = '';
+                    document.getElementById('emailAddresses').value = '';
+                    loadEmailLists();
+                    showStatus('Email list created successfully!', 'success');
+                } else {
+                    showStatus('Error creating list', 'error');
+                }
+            } catch (error) {
+                showStatus('Error creating list: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteList(listId) {
+            if (!confirm('Are you sure you want to delete this list?')) return;
+            
+            try {
+                const response = await fetch(`/api/lists/${listId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadEmailLists();
+                    showStatus('List deleted successfully', 'success');
+                } else {
+                    showStatus('Error deleting list', 'error');
+                }
+            } catch (error) {
+                showStatus('Error deleting list: ' + error.message, 'error');
+            }
+        }
+
+        async function sendEmails() {
+            const listId = document.getElementById('selectedList').value;
+            const subject = document.getElementById('subject').value.trim();
+            const message = document.getElementById('message').value.trim();
+            const senderName = document.getElementById('senderName').value.trim();
+            
+            if (!listId || !subject || !message || !senderName) {
+                showStatus('Please fill in all fields and select a list', 'error');
+                return;
+            }
+            
+            const sendBtn = document.getElementById('sendBtn');
+            const sendStatus = document.getElementById('sendStatus');
+            
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+            sendStatus.textContent = 'Preparing to send emails...';
+            
+            try {
+                const response = await fetch('/api/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        listId,
+                        subject,
+                        message,
+                        senderName
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const successful = result.results.filter(r => r.status === 'sent').length;
+                    const failed = result.results.filter(r => r.status === 'failed').length;
+                    showStatus(`Emails sent! ✅ ${successful} successful, ❌ ${failed} failed`, 'success');
+                } else {
+                    showStatus('Error sending emails: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error sending emails: ' + error.message, 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send Emails';
+                sendStatus.textContent = '';
+            }
+        }
+
+        async function testConnection() {
+            try {
+                const response = await fetch('/api/test', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('✅ SMTP connection successful!', 'success');
+                } else {
+                    showStatus('❌ SMTP connection failed: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Connection test failed: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

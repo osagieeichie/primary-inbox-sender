@@ -13,25 +13,20 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Email configuration - using SMTP with your domain
-
-const transporter = nodemailer.createTransport({
-
-  service: 'gmail',
-
+const transporter = nodemailer.createTransporter({
+  host: process.env.SMTP_HOST, // Your domain's SMTP server
+  port: 587,
+  secure: false,
   auth: {
-
-    user: process.env.SMTP_USER,
-
-    pass: process.env.SMTP_PASS
-
+    user: process.env.SMTP_USER, // hey@enchantgifts.store
+    pass: process.env.SMTP_PASS  // Your email password or app password
   },
-
-  tls: {
-
-    rejectUnauthorized: false
-
+  // Remove tracking headers and keep it clean
+  headers: {
+    'X-Priority': '3',
+    'X-MSMail-Priority': 'Normal',
+    'Importance': 'Normal'
   }
-
 });
 
 // Store email lists in memory (in production, use a database)
@@ -50,30 +45,40 @@ app.get('/api/lists', (req, res) => {
 
 // Create new email list
 app.post('/api/lists', (req, res) => {
-  const { name, contacts, emails } = req.body;
-  
-  let contactList = [];
-  
-  if (contacts && contacts.length > 0) {
-    contactList = contacts;
-  } else if (emails) {
-    contactList = emails.split('\n').filter(email => email.trim()).map((email, index) => ({
-      sn: index + 1,
-      firstName: '',
-      lastName: '',
-      email: email.trim()
-    }));
+  try {
+    const { name, contacts, emails } = req.body;
+    
+    let contactList = [];
+    
+    if (contacts && Array.isArray(contacts) && contacts.length > 0) {
+      // New format with contacts array
+      contactList = contacts;
+    } else if (emails && typeof emails === 'string') {
+      // Old format with emails string
+      contactList = emails.split('\n').filter(email => email.trim()).map((email, index) => ({
+        sn: index + 1,
+        firstName: '',
+        lastName: '',
+        email: email.trim()
+      }));
+    } else {
+      return res.status(400).json({ error: 'Please provide either contacts array or emails string' });
+    }
+    
+    const newList = {
+      id: Date.now().toString(),
+      name: name || 'Untitled List',
+      contacts: contactList,
+      createdAt: new Date()
+    };
+    
+    emailLists.push(newList);
+    res.json(newList);
+    
+  } catch (error) {
+    console.error('Error creating list:', error);
+    res.status(500).json({ error: 'Failed to create list: ' + error.message });
   }
-  
-  const newList = {
-    id: Date.now().toString(),
-    name,
-    contacts: contactList,
-    createdAt: new Date()
-  };
-  
-  emailLists.push(newList);
-  res.json(newList);
 });
 
 // Delete email list

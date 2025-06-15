@@ -304,13 +304,13 @@
         </div>
 
         <div class="tips">
-            <h3>💡 Tips for Primary Inbox Delivery</h3>
+            <h3>💡 Smart Email Personalization</h3>
             <ul>
+                <li><strong>{{firstName}}</strong> automatically uses: First Name → Last Name → "Writer"</li>
                 <li>Keep emails personal and conversational</li>
-                <li>Use plain text format (no HTML)</li>
+                <li>Use plain text format for maximum deliverability</li>
                 <li>Avoid promotional language and excessive formatting</li>
                 <li>Send from a warm domain with good reputation</li>
-                <li>Include personalized sender names</li>
             </ul>
         </div>
 
@@ -441,6 +441,11 @@
                                 </div>
                                 
                                 <div class="format-group">
+                                    <button type="button" class="format-btn" onclick="insertPersonalization('firstName')" title="Insert First Name" style="background: #e8f5e8; border-color: #4caf50;">{{firstName}}</button>
+                                    <button type="button" class="format-btn" onclick="insertPersonalization('lastName')" title="Insert Last Name" style="background: #fff3e0; border-color: #ff9800;">{{lastName}}</button>
+                                </div>
+                                
+                                <div class="format-group">
                                     <button type="button" class="format-btn" onclick="togglePlainText()" title="Toggle Plain Text Mode" id="plainTextToggle">📝 Plain Text</button>
                                 </div>
                             </div>
@@ -453,9 +458,11 @@
 I hope you're doing well! I wanted to reach out personally about...
 
 Best regards,
-Your Name
+{{firstName}} {{lastName}}
 
-💡 Tip: Use {{firstName}} to automatically personalize each email">
+💡 Smart Personalization:
+• {{firstName}} = First Name → Last Name → 'Writer' (automatic fallback)
+• {{lastName}} = Last Name only (empty if not available)">
                             </div>
                             
                             <textarea id="message" 
@@ -465,9 +472,11 @@ Your Name
 I hope you're doing well! I wanted to reach out personally about...
 
 Best regards,
-Your Name
+{{firstName}} {{lastName}}
 
-💡 Tip: Use {{firstName}} to automatically personalize each email"></textarea>
+💡 Smart Personalization:
+• {{firstName}} = First Name → Last Name → 'Writer' (automatic fallback)
+• {{lastName}} = Last Name only (empty if not available)"></textarea>
                         </div>
                     </div>
                 </div>
@@ -556,13 +565,16 @@ Your Name
             }
             
             csvData = [];
+            const seenEmails = new Set();
+            let duplicateCount = 0;
             let preview = '<table style="width: 100%; font-size: 11px;"><tr>';
-            preview += '<th>S/N</th><th>First Name</th><th>Last Name</th><th>Email</th></tr>';
+            preview += '<th>S/N</th><th>First Name</th><th>Last Name</th><th>Email</th><th>Status</th></tr>';
             
             for (let i = 1; i < lines.length; i++) {
                 if (lines[i].trim() === '') continue;
                 
                 const columns = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
+                const email = columns[emailIndex].toLowerCase().trim();
                 
                 const contact = {
                     sn: snIndex >= 0 ? columns[snIndex] : i,
@@ -572,14 +584,27 @@ Your Name
                 };
                 
                 if (contact.email && contact.email.includes('@')) {
-                    csvData.push(contact);
-                    
-                    preview += `<tr>
-                        <td>${contact.sn}</td>
-                        <td>${contact.firstName}</td>
-                        <td>${contact.lastName}</td>
-                        <td>${contact.email}</td>
-                    </tr>`;
+                    if (!seenEmails.has(email)) {
+                        seenEmails.add(email);
+                        csvData.push(contact);
+                        
+                        preview += `<tr>
+                            <td>${contact.sn}</td>
+                            <td>${contact.firstName}</td>
+                            <td>${contact.lastName}</td>
+                            <td>${contact.email}</td>
+                            <td style="color: green;">✓ Unique</td>
+                        </tr>`;
+                    } else {
+                        duplicateCount++;
+                        preview += `<tr style="background: #fff3cd;">
+                            <td>${contact.sn}</td>
+                            <td>${contact.firstName}</td>
+                            <td>${contact.lastName}</td>
+                            <td>${contact.email}</td>
+                            <td style="color: orange;">⚠ Duplicate</td>
+                        </tr>`;
+                    }
                 }
             }
             
@@ -588,7 +613,11 @@ Your Name
             document.getElementById('csvPreview').style.display = 'block';
             document.getElementById('csvPreviewContent').innerHTML = preview;
             
-            showStatus(`CSV loaded: ${csvData.length} contacts found`, 'success');
+            const message = duplicateCount > 0 ? 
+                `CSV loaded: ${csvData.length} unique contacts found (${duplicateCount} duplicates removed)` :
+                `CSV loaded: ${csvData.length} contacts found`;
+                
+            showStatus(message, 'success');
         }
 
         function formatText(command, value = null) {
@@ -600,6 +629,48 @@ Your Name
             const url = prompt('Enter the URL:');
             if (url) {
                 formatText('createLink', url);
+            }
+        }
+
+        function insertPersonalization(type) {
+            const editor = document.getElementById('messageEditor');
+            const textarea = document.getElementById('message');
+            
+            let insertText = '';
+            if (type === 'firstName') {
+                insertText = '{{firstName}}';
+            } else if (type === 'lastName') {
+                insertText = '{{lastName}}';
+            }
+            
+            if (isPlainTextMode) {
+                // Insert in textarea
+                const cursorPos = textarea.selectionStart;
+                const textBefore = textarea.value.substring(0, cursorPos);
+                const textAfter = textarea.value.substring(textarea.selectionEnd);
+                textarea.value = textBefore + insertText + textAfter;
+                textarea.selectionStart = textarea.selectionEnd = cursorPos + insertText.length;
+                textarea.focus();
+            } else {
+                // Insert in rich text editor
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const textNode = document.createTextNode(insertText);
+                    range.deleteContents();
+                    range.insertNode(textNode);
+                    range.setStartAfter(textNode);
+                    range.setEndAfter(textNode);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } else {
+                    // If no selection, append to end
+                    editor.innerHTML += insertText;
+                }
+                editor.focus();
+                
+                // Update hidden textarea
+                textarea.value = editor.innerHTML;
             }
         }
 

@@ -13,25 +13,20 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Email configuration - using SMTP with your domain
-
-const transporter = nodemailer.createTransport({
-
-  service: 'gmail',
-
+const transporter = nodemailer.createTransporter({
+  host: process.env.SMTP_HOST, // Your domain's SMTP server
+  port: 587,
+  secure: false,
   auth: {
-
-    user: process.env.SMTP_USER,
-
-    pass: process.env.SMTP_PASS
-
+    user: process.env.SMTP_USER, // hey@enchantgifts.store
+    pass: process.env.SMTP_PASS  // Your email password or app password
   },
-
-  tls: {
-
-    rejectUnauthorized: false
-
+  // Remove tracking headers and keep it clean
+  headers: {
+    'X-Priority': '3',
+    'X-MSMail-Priority': 'Normal',
+    'Importance': 'Normal'
   }
-
 });
 
 // Store email lists in memory (in production, use a database)
@@ -115,23 +110,50 @@ async function processEmailsInBackground(contacts, subject, message, html, sende
   const results = [];
   let successCount = 0;
   let failCount = 0;
+  let duplicateCount = 0;
   
-  console.log(`Starting to send ${contacts.length} emails...`);
+  // Remove duplicates based on email address
+  const seenEmails = new Set();
+  const uniqueContacts = [];
   
-  for (let i = 0; i < contacts.length; i++) {
-    const contact = contacts[i];
+  for (const contact of contacts) {
+    const email = contact.email.toLowerCase().trim();
+    if (!seenEmails.has(email)) {
+      seenEmails.add(email);
+      uniqueContacts.push(contact);
+    } else {
+      duplicateCount++;
+      console.log(`🔄 Skipped duplicate email: ${contact.email}`);
+    }
+  }
+  
+  console.log(`Starting to send ${uniqueContacts.length} emails (${duplicateCount} duplicates removed from ${contacts.length} total)...`);
+  
+  for (let i = 0; i < uniqueContacts.length; i++) {
+    const contact = uniqueContacts[i];
     
     try {
-      // Personalize the message for each contact
+      // Smart personalization with fallbacks
       let personalizedSubject = subject;
       let personalizedMessage = message;
       let personalizedHtml = html;
       
-      if (contact.firstName) {
-        personalizedSubject = subject.replace(/\{\{firstName\}\}/g, contact.firstName);
-        personalizedMessage = message.replace(/\{\{firstName\}\}/g, contact.firstName);
+      // Determine what name to use
+      let nameToUse = '';
+      if (contact.firstName && contact.firstName.trim()) {
+        nameToUse = contact.firstName.trim();
+      } else if (contact.lastName && contact.lastName.trim()) {
+        nameToUse = contact.lastName.trim();
+      } else {
+        nameToUse = 'Writer'; // Default fallback
+      }
+      
+      // Replace {{firstName}} with the determined name
+      if (nameToUse) {
+        personalizedSubject = subject.replace(/\{\{firstName\}\}/g, nameToUse);
+        personalizedMessage = message.replace(/\{\{firstName\}\}/g, nameToUse);
         if (html) {
-          personalizedHtml = html.replace(/\{\{firstName\}\}/g, contact.firstName);
+          personalizedHtml = html.replace(/\{\{firstName\}\}/g, nameToUse);
         }
       }
 
@@ -156,26 +178,26 @@ async function processEmailsInBackground(contacts, subject, message, html, sende
       await transporter.sendMail(mailOptions);
       
       successCount++;
-      console.log(`✅ Sent ${i + 1}/${contacts.length} to ${contact.email}`);
+      console.log(`✅ Sent ${i + 1}/${uniqueContacts.length} to ${contact.email} (using "${nameToUse}")`);
       
       // Shorter delay for larger lists, longer for smaller lists
-      const delay = contacts.length > 100 ? 1000 : 2000; // 1 second for large lists
+      const delay = uniqueContacts.length > 100 ? 1000 : 2000; // 1 second for large lists
       await new Promise(resolve => setTimeout(resolve, delay));
       
     } catch (error) {
       failCount++;
-      console.error(`❌ Failed ${i + 1}/${contacts.length} to ${contact.email}:`, error.message);
+      console.error(`❌ Failed ${i + 1}/${uniqueContacts.length} to ${contact.email}:`, error.message);
       
       // Continue with other emails even if one fails
     }
     
     // Log progress every 50 emails
     if ((i + 1) % 50 === 0) {
-      console.log(`Progress: ${i + 1}/${contacts.length} processed. ✅ ${successCount} sent, ❌ ${failCount} failed`);
+      console.log(`Progress: ${i + 1}/${uniqueContacts.length} processed. ✅ ${successCount} sent, ❌ ${failCount} failed`);
     }
   }
   
-  console.log(`🎉 Email sending completed! ✅ ${successCount} sent, ❌ ${failCount} failed out of ${contacts.length} total`);
+  console.log(`🎉 Email sending completed! ✅ ${successCount} sent, ❌ ${failCount} failed, 🔄 ${duplicateCount} duplicates removed. Total processed: ${uniqueContacts.length} unique emails.`);
 }
 
 // Test email configuration

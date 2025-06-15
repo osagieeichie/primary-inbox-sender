@@ -13,20 +13,25 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Email configuration - using SMTP with your domain
-const transporter = nodemailer.createTransporter({
-  host: process.env.SMTP_HOST, // Your domain's SMTP server
-  port: 587,
-  secure: false,
+
+const transporter = nodemailer.createTransport({
+
+  service: 'gmail',
+
   auth: {
-    user: process.env.SMTP_USER, // hey@enchantgifts.store
-    pass: process.env.SMTP_PASS  // Your email password or app password
+
+    user: process.env.SMTP_USER,
+
+    pass: process.env.SMTP_PASS
+
   },
-  // Remove tracking headers and keep it clean
-  headers: {
-    'X-Priority': '3',
-    'X-MSMail-Priority': 'Normal',
-    'Importance': 'Normal'
+
+  tls: {
+
+    rejectUnauthorized: false
+
   }
+
 });
 
 // Store email lists in memory (in production, use a database)
